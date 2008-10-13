@@ -1,0 +1,143 @@
+#!/usr/bin/env ruby
+
+### selection2 --- Another quick and dirty natural selection simulation.
+## Copyright 2008 by Dave Pearson <http://www.davep.org/>
+##
+## selection2 is free software distributed under the terms of the GNU General
+## Public Licence, version 2. For details see the file COPYING.
+
+# Another quick, dirty and very simplistic exploration of mutation and
+# selection.
+#
+# Inspired by this post:
+#
+#   http://mwillett.org/Debate/viewtopic.php?p=208213#208213
+#
+# On Debate Unlimited <http://mwillett.org/Debate/>
+#
+# Send fixes to my email address (see website for details).
+#
+# Dave Pearson <http://www.davep.org/>
+
+############################################################################
+# Add a random item selection method to ruby's array class.
+class Array
+
+  def random
+    self[ rand( length ) ]
+  end
+  
+end
+  
+############################################################################
+# Class that loads and holds a list of english words.
+class Words < Array
+
+  ##########################################################################
+  # Constructor.
+  def initialize
+
+    # Load the contents of /usr/dict/words. Downcase as we go.
+    IO.readlines( "/usr/dict/words" ).each do |line|
+      self << line.chomp.downcase
+    end
+    
+  end
+
+  ##########################################################################
+  # This just stops irb-in-emacs from getting horribly clogged up.
+  def inspect
+    "#{size} words"
+  end
+
+end
+
+############################################################################
+# Class that provides different mutation methods.
+class Mutator
+
+  ##########################################################################
+  # Return a random character between 'a' and 'z'.
+  def random_char
+    ('a'..'z').to_a.random
+  end
+  
+  ##########################################################################
+  # Point mutation.
+  def point( word )
+    word = word.clone
+    word[ rand( word.size ) ] = random_char
+    word
+  end
+
+  ##########################################################################
+  # Deletion mutation.
+  def delete( word )
+    word = word.clone
+    word[ rand( word.size ) ] = ""
+    word
+  end
+
+  ##########################################################################
+  # Insertion mutation.
+  def insert( word )
+    word = word.clone
+    word[ rand( word.size ), 0 ] = random_char
+    word
+  end
+
+  ##########################################################################
+  # Randomly mutate the given word.
+  def randomly( word )
+    send( [ :point, :delete, :insert ].random, word )
+  end
+  
+end
+
+if $0 == __FILE__
+
+  # Load a list of words.
+  words = Words.new
+
+  # Initial word is a random three letter word.
+  population = [ words.select {|word| word.size == 3 }.random ]
+
+  # Remember who started this.
+  adeveam = population[ 0 ]
+
+  # Create the mutator. Fear the mutator!
+  mutate = Mutator.new
+
+  # The cycle.
+  cycle = 0
+  
+  # Run until there's a viable popualtion of at least 300 strings.
+  while population.size < 300
+
+    # Copy and mutate every member of the population.
+    population += ( 0..population.size ).inject( [] ) do |a,i|
+      a << mutate.randomly( population.random )
+    end
+
+    # Record the pre-culling size.
+    before = population.size
+    
+    # Now (un)naturally select for those that are fit for the environment.
+    population.reject! {|word| not words.include?( word ) }
+
+    # Report on what the cull did.
+    puts "Cycle ##{cycle} #{before - population.size} mutations culled. Population size is now #{population.size}"
+
+    # Increase the cycle count.
+    cycle += 1
+    
+  end
+
+  # Show the current result.
+  puts "Final population size: #{population.size}"
+  puts "We started with #{adeveam} and ended up with these unique words:"
+  puts population.uniq.sort {|w1,w2| w1.size <=> w2.size }.join( ", " )
+
+end
+
+### selection2 ends here.

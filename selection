@@ -1,0 +1,172 @@
+#!/usr/bin/env ruby
+
+### selection --- Quick and dirty natural selection simulation.
+## Copyright 2008 by Dave Pearson <http://www.davep.org/>
+##
+## selection is free software distributed under the terms of the GNU General
+## Public Licence, version 2. For details see the file COPYING.
+
+# Quick, dirty and very simplistic exploration of mutation and selection.
+# Caution: it's a lunchtime quick hack and probably has issues(TM).
+#
+# I wouldn't even offer it as a good example of ruby code.
+#
+# Send fixes to my email address (see website for details).
+#
+# Dave Pearson <http://www.davep.org/>
+
+############################################################################
+# List of characters that we'll work with.
+CHARACTERS = (32..125).collect {|c| c.chr }
+
+############################################################################
+# Add a random item selection method to ruby's array class.
+class Array
+
+  def random
+    self[ rand( length ) ]
+  end
+  
+end
+
+############################################################################
+# Add a difference count method to ruby's array class.
+class String
+
+  def difference_count( target )
+    ( 0..size ).inject( 0 ) {|count,i| count + ( self[ i ] == target[ i ] ? 0 : 1 ) }
+  end
+  
+end
+
+############################################################################
+# The things that will populate the world.
+class Thing
+
+  # Access to the string representation.
+  attr_reader :me
+
+  ##########################################################################
+  # Constructor.
+  def initialize( initial )
+    # If we got a number...
+    if initial.class == Fixnum
+      # ...generate a random string to that length.
+      @me = (1..initial).inject( "" ) {|s,i| s << CHARACTERS.random }
+    else
+      # Otherwise assume it's a string and become that.
+      @me = initial
+    end
+  end
+
+  ##########################################################################
+  # Mutate a random character.
+  def mutate!
+    @me[ rand( @me.size ) ] = CHARACTERS.random
+    self
+  end
+  
+  ##########################################################################
+  # Breed with something else.
+  def breed_with( other_thing )
+
+    # Decide which bit of the string to copy over.
+    start = rand( @me.size - 1 )
+    count = rand( @me.size - start )
+
+    # Create the offspring based on us.
+    offspring = self.class.new( @me.clone )
+
+    # Insert the bit of text from the other thing into us.
+    offspring.me[ start, count ] = other_thing.me[ start, count ]
+
+    # Mutate.
+    offspring.mutate!
+    
+  end
+
+  ##########################################################################
+  # Convert to string.
+  def to_s
+    @me
+  end
+
+end
+
+############################################################################
+# The environment that the things live in.
+class Environment
+
+  ##########################################################################
+  # Access to the best thing so far.
+  attr_reader :best
+  
+  ##########################################################################
+  # Constructor.
+  def initialize( landscape )
+
+    # Remember our landscape.
+    @landscape = landscape
+
+    # Random choices to start the best and next best.
+    @best      = Thing.new( landscape.size )
+    @next_best = Thing.new( landscape.size )
+    
+  end
+
+  ##########################################################################
+  # Hot thing action.
+  def shit_happens
+
+    # Create a new thing by breeding the best thing and the next best thing.
+    new = @best.breed_with( @next_best )
+
+    # Get the scores for the new, best and next best thing.
+    new_score       = new.me.difference_count( @landscape )
+    best_score      = @best.me.difference_count( @landscape )
+    next_best_score = @next_best.me.difference_count( @landscape )
+
+    # Best thing ever?
+    if new_score < best_score
+      # Yup.
+      @next_best = @best
+      @best      = new
+    elsif new_score < next_best_score
+      # Seems it's the next best thing ever.
+      @next_best = new
+    end
+
+    # Return self because... well, just because.
+    self
+    
+  end
+
+  ##########################################################################
+  # Evolve things in the environment.
+  def evolve( max )
+    max.times do |i|
+      shit_happens
+      yield i
+      break if @best.me == @landscape
+    end
+  end
+  
+end
+
+############################################################################
+# Provide a selection command.
+if $0 == __FILE__
+
+  world = Environment.new( ARGV[ 0 ] || "Welcome to Debate Unlimited" )
+  took  = 0
+  world.evolve 20000 do |count|
+    if count % 1000 == 0
+      puts "After #{count} cycles: \"#{world.best.me}\""
+    end
+    took = count
+  end
+  puts "After #{took} cycles: \"#{world.best.me}\""
+
+end
+
+### selection ends here
